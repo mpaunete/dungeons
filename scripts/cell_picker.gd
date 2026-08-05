@@ -163,3 +163,12 @@ func get_current_cell() -> Vector2i:
 		return DungeonConstants.NO_CELL
 
 	return current_cell
+
+
+# -------------------------------------------------------------------
+# Reset
+# -------------------------------------------------------------------
+
+func reset() -> void:
+	current_cell = DungeonConstants.NO_CELL
+	current_is_valid = false

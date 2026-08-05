@@ -2,10 +2,10 @@ class_name SelectionFillBuilder
 extends RefCounted
 
 
-# Builds a blue surface-overlay mesh for selected dungeon cells.
+# Builds a surface-overlay mesh for selected dungeon cells.
 #
-# The generated vertices follow the same subdivided and noisy terrain
-# points as the underlying dungeon surface.
+# The top overlay follows the same subdivided, noisy terrain as the
+# dungeon surface. Exposed vertical walls receive matching overlays.
 
 
 # -------------------------------------------------------------------
@@ -31,24 +31,26 @@ func initialize(
 
 func build_mesh(
 	cells: Array[Vector2i],
-	surface_offset: float
+	surface_offset: float,
+	bottom_clearance: float = 0.015
 ) -> ArrayMesh:
+	if generator == null:
+		push_error(
+			"SelectionFillBuilder: DungeonGenerator is not initialized."
+		)
+		return ArrayMesh.new()
+
 	var surface_tool: SurfaceTool = SurfaceTool.new()
+
 	surface_tool.begin(
 		Mesh.PRIMITIVE_TRIANGLES
 	)
 
 	for cell: Vector2i in cells:
-		if not generator.is_valid_map_cell(cell):
+		if not _is_fillable_cell(cell):
 			continue
 
-		# For this first version, highlight only solid blocks.
-		#
-		# Excavated/open cells can receive a floor overlay later.
-		if generator.is_hole(cell):
-			continue
-
-		_add_cell_surface(
+		_add_cell_top_surface(
 			surface_tool,
 			cell,
 			surface_offset
@@ -57,17 +59,34 @@ func build_mesh(
 		_add_exposed_vertical_faces(
 			surface_tool,
 			cell,
-			surface_offset
+			surface_offset,
+			bottom_clearance
 		)
 
 	return surface_tool.commit()
 
 
 # -------------------------------------------------------------------
-# Cell Surface
+# Cell Validation
 # -------------------------------------------------------------------
 
-func _add_cell_surface(
+func _is_fillable_cell(
+	cell: Vector2i
+) -> bool:
+	if not generator.is_valid_map_cell(cell):
+		return false
+
+	if generator.is_hole(cell):
+		return false
+
+	return true
+
+
+# -------------------------------------------------------------------
+# Cell Top Surface
+# -------------------------------------------------------------------
+
+func _add_cell_top_surface(
 	surface_tool: SurfaceTool,
 	cell: Vector2i,
 	surface_offset: float
@@ -80,7 +99,9 @@ func _add_cell_surface(
 		cell.y * generator.subdivisions
 	)
 
-	var offset: Vector3 = Vector3.UP * surface_offset
+	var offset: Vector3 = (
+		Vector3.UP * surface_offset
+	)
 
 	for sub_x: int in range(
 		generator.subdivisions
@@ -100,28 +121,32 @@ func _add_cell_surface(
 				generator.get_terrain_point(
 					lattice_x,
 					lattice_z
-				) + offset
+				)
+				+ offset
 			)
 
 			var point_10: Vector3 = (
 				generator.get_terrain_point(
 					lattice_x + 1,
 					lattice_z
-				) + offset
+				)
+				+ offset
 			)
 
 			var point_01: Vector3 = (
 				generator.get_terrain_point(
 					lattice_x,
 					lattice_z + 1
-				) + offset
+				)
+				+ offset
 			)
 
 			var point_11: Vector3 = (
 				generator.get_terrain_point(
 					lattice_x + 1,
 					lattice_z + 1
-				) + offset
+				)
+				+ offset
 			)
 
 			_add_triangle(
@@ -146,7 +171,8 @@ func _add_cell_surface(
 func _add_exposed_vertical_faces(
 	surface_tool: SurfaceTool,
 	cell: Vector2i,
-	face_offset: float
+	surface_offset: float,
+	bottom_clearance: float
 ) -> void:
 	var start_x: int = (
 		cell.x * generator.subdivisions
@@ -193,37 +219,37 @@ func _add_exposed_vertical_faces(
 			Vector3(
 				0.0,
 				0.0,
-				-face_offset
+				-surface_offset
 			),
-			face_offset
+			bottom_clearance
 		)
 
 	if generator.is_open_cell(south_cell):
 		_add_x_vertical_face(
 			surface_tool,
-			end_x,
 			start_x,
+			end_x,
 			end_z,
 			Vector3(
 				0.0,
 				0.0,
-				face_offset
+				surface_offset
 			),
-			face_offset
+			bottom_clearance
 		)
 
 	if generator.is_open_cell(west_cell):
 		_add_z_vertical_face(
 			surface_tool,
-			end_z,
 			start_z,
+			end_z,
 			start_x,
 			Vector3(
-				-face_offset,
+				-surface_offset,
 				0.0,
 				0.0
 			),
-			face_offset
+			bottom_clearance
 		)
 
 	if generator.is_open_cell(east_cell):
@@ -233,11 +259,11 @@ func _add_exposed_vertical_faces(
 			end_z,
 			end_x,
 			Vector3(
-				face_offset,
+				surface_offset,
 				0.0,
 				0.0
 			),
-			face_offset
+			bottom_clearance
 		)
 
 
@@ -385,17 +411,6 @@ func _add_z_vertical_face(
 # Mesh Helpers
 # -------------------------------------------------------------------
 
-func _add_triangle(
-	surface_tool: SurfaceTool,
-	point_a: Vector3,
-	point_b: Vector3,
-	point_c: Vector3
-) -> void:
-	surface_tool.add_vertex(point_a)
-	surface_tool.add_vertex(point_b)
-	surface_tool.add_vertex(point_c)
-
-
 func _add_quad(
 	surface_tool: SurfaceTool,
 	top_a: Vector3,
@@ -415,4 +430,23 @@ func _add_quad(
 		top_b,
 		bottom_a,
 		bottom_b
+	)
+
+
+func _add_triangle(
+	surface_tool: SurfaceTool,
+	point_a: Vector3,
+	point_b: Vector3,
+	point_c: Vector3
+) -> void:
+	surface_tool.add_vertex(
+		point_a
+	)
+
+	surface_tool.add_vertex(
+		point_b
+	)
+
+	surface_tool.add_vertex(
+		point_c
 	)
