@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://dtersihqupkfl"]
+
+[ext_resource type="Script" uid="uid://orslptwq0hfu" path="res://scripts/highlight_effect.gd" id="1_s0c2h"]
+[ext_resource type="Material" uid="uid://s0hfyxbylp4i" path="res://materials/selection_edges_material.tres" id="2_a2r26"]
+
+[node name="HighlightEffect" type="Node3D" unique_id=243106202]
+script = ExtResource("1_s0c2h")
+
+[node name="GlowEdges" type="MeshInstance3D" parent="." unique_id=1540575355]
+material_override = ExtResource("2_a2r26")

@@ -1,0 +1,126 @@
+extends Node3D
+
+
+@export_category("Fade Timing")
+
+@export_range(0.01, 1.0, 0.01)
+var fade_in_time: float = 0.12
+
+@export_range(0.01, 1.0, 0.01)
+var fade_out_time: float = 0.16
+
+
+@onready var glow_edges: MeshInstance3D = $GlowEdges
+
+
+var glow_material: ShaderMaterial
+var fade_tween: Tween
+var is_fading_out: bool = false
+
+
+func _ready() -> void:
+	glow_material = (
+		glow_edges.material_override
+		as ShaderMaterial
+	)
+
+	if glow_material == null:
+		push_error(
+			"HighlightEffect: GlowEdges requires a ShaderMaterial."
+		)
+		return
+
+	# Each highlight needs independent opacity while fading.
+	glow_material = (
+		glow_material.duplicate(true)
+		as ShaderMaterial
+	)
+
+	glow_edges.material_override = glow_material
+
+	_set_effect_opacity(0.0)
+
+
+func setup(edge_mesh: ArrayMesh) -> void:
+	glow_edges.mesh = edge_mesh
+
+
+func play_in() -> void:
+	is_fading_out = false
+	_stop_fade_tween()
+
+	var current_opacity: float = _get_effect_opacity()
+
+	fade_tween = create_tween()
+
+	fade_tween.tween_method(
+		_set_effect_opacity,
+		current_opacity,
+		1.0,
+		fade_in_time
+	).set_trans(
+		Tween.TRANS_QUAD
+	).set_ease(
+		Tween.EASE_OUT
+	)
+
+
+func play_out() -> void:
+	if is_fading_out:
+		return
+
+	is_fading_out = true
+	_stop_fade_tween()
+
+	var current_opacity: float = _get_effect_opacity()
+
+	fade_tween = create_tween()
+
+	fade_tween.tween_method(
+		_set_effect_opacity,
+		current_opacity,
+		0.0,
+		fade_out_time
+	).set_trans(
+		Tween.TRANS_QUAD
+	).set_ease(
+		Tween.EASE_IN
+	)
+
+	fade_tween.tween_callback(queue_free)
+
+
+func _get_effect_opacity() -> float:
+	if glow_material == null:
+		return 0.0
+
+	var shader_value: Variant = (
+		glow_material.get_shader_parameter(
+			"effect_opacity"
+		)
+	)
+
+	if shader_value == null:
+		return 0.0
+
+	return float(shader_value)
+
+
+func _set_effect_opacity(value: float) -> void:
+	if glow_material == null:
+		return
+
+	glow_material.set_shader_parameter(
+		"effect_opacity",
+		value
+	)
+
+
+func _stop_fade_tween() -> void:
+	if fade_tween == null:
+		return
+
+	if fade_tween.is_valid():
+		fade_tween.kill()
+
+	fade_tween = null

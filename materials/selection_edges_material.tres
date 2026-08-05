@@ -1,0 +1,23 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://s0hfyxbylp4i"]
+
+[ext_resource type="Shader" uid="uid://dfco4jm60aeqb" path="res://shaders/selection_edges.gdshader" id="1_co4y2"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_co4y2")
+shader_parameter/line_color = Color(0.37608117, 0.6488062, 0.8718101, 1)
+shader_parameter/star_color = Color(0.85645133, 0.9592158, 0.9999998, 1)
+shader_parameter/effect_opacity = 1.0
+shader_parameter/core_width = 0.15500000666398
+shader_parameter/halo_width = 1.0
+shader_parameter/line_brightness = 0.4370000207575
+shader_parameter/halo_brightness = 0.2
+shader_parameter/star_count = 6
+shader_parameter/star_speed = 0.1
+shader_parameter/star_min_size = 0.012
+shader_parameter/star_max_size = 0.026
+shader_parameter/star_min_width = 0.3
+shader_parameter/star_max_width = 0.74000003445148
+shader_parameter/star_brightness = 0.10000000475
+shader_parameter/star_pulse_speed = 1.6
+shader_parameter/star_pulse_amount = 0.25

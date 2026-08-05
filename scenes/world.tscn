@@ -1,0 +1,79 @@
+[gd_scene format=3 uid="uid://dfqm3v23vdhbs"]
+
+[ext_resource type="PackedScene" uid="uid://p11scqgpdpum" path="res://scenes/dungeon.tscn" id="1_nnsk1"]
+[ext_resource type="PackedScene" uid="uid://dtersihqupkfl" path="res://scenes/highlight_effect.tscn" id="2_4wyf3"]
+[ext_resource type="Script" uid="uid://c5d8aoe83osju" path="res://scripts/camera_rig.gd" id="2_rwgxs"]
+[ext_resource type="Script" uid="uid://b0wu8app0mc8y" path="res://scripts/dungeon_generator.gd" id="3_k0juu"]
+[ext_resource type="Script" uid="uid://bn6hxrjaev47l" path="res://scripts/cell_picker.gd" id="4_71j4m"]
+[ext_resource type="Script" uid="uid://bdwic18rru332" path="res://scripts/highlight_manager.gd" id="5_qfnet"]
+[ext_resource type="Script" uid="uid://cu48ut03x3mk2" path="res://scripts/selection_manager.gd" id="6_i7141"]
+[ext_resource type="Shader" uid="uid://ca7wtpw4o5qiu" path="res://shaders/selection_fill.gdshader" id="7_4mrxx"]
+[ext_resource type="Material" uid="uid://s0hfyxbylp4i" path="res://materials/selection_edges_material.tres" id="8_7r4gi"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_wp35b"]
+render_priority = 0
+shader = ExtResource("7_4mrxx")
+shader_parameter/fill_color = Color(0.3594251, 0.5707699, 1, 1)
+shader_parameter/fill_opacity = 0.22
+
+[sub_resource type="Environment" id="Environment_rwgxs"]
+background_mode = 1
+background_color = Color(0.14839911, 0.14920926, 0.17187482, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.24477637, 0.2447764, 0.24477637, 1)
+ambient_light_energy = 0.4
+glow_enabled = true
+glow_normalized = true
+glow_intensity = 0.8
+glow_blend_mode = 0
+
+[node name="World" type="Node3D" unique_id=926736566]
+
+[node name="Dungeon" parent="." unique_id=1935076749 instance=ExtResource("1_nnsk1")]
+selection_edge_width = 0.17400000000000002
+selection_surface_offset = 0.014
+selection_bottom_clearance = 0.01
+show_fixed_selection = false
+highlight_effect_scene = ExtResource("2_4wyf3")
+
+[node name="Terrain" type="MeshInstance3D" parent="Dungeon" unique_id=2027379458]
+
+[node name="Floor" type="MeshInstance3D" parent="Dungeon" unique_id=1928279499]
+
+[node name="HighlightEffects" type="Node3D" parent="Dungeon" unique_id=335822566]
+
+[node name="DungeonGenerator" type="Node" parent="Dungeon" unique_id=99846104]
+script = ExtResource("3_k0juu")
+map_size = 64
+
+[node name="CellPicker" type="Node" parent="Dungeon" unique_id=947913642]
+script = ExtResource("4_71j4m")
+
+[node name="HighlightManager" type="Node" parent="Dungeon" unique_id=1104807350]
+script = ExtResource("5_qfnet")
+
+[node name="SelectionManager" type="Node" parent="Dungeon" unique_id=193603083]
+script = ExtResource("6_i7141")
+border_surface_offset = 0.001
+
+[node name="SelectionFill" type="MeshInstance3D" parent="Dungeon/SelectionManager" unique_id=674478584]
+material_override = SubResource("ShaderMaterial_wp35b")
+cast_shadow = 0
+
+[node name="SelectionBorder" type="MeshInstance3D" parent="Dungeon/SelectionManager" unique_id=1661438293]
+material_override = ExtResource("8_7r4gi")
+cast_shadow = 0
+
+[node name="CameraRig" type="Node3D" parent="." unique_id=319347026]
+script = ExtResource("2_rwgxs")
+minimum_distance = 5.0
+
+[node name="Camera" type="Camera3D" parent="CameraRig" unique_id=1491925025]
+current = true
+size = 14.0
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1359740418]
+transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=327220728]
+environment = SubResource("Environment_rwgxs")
