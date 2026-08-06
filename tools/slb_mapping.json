@@ -1,0 +1,113 @@
+{
+	"0": {
+		"name": "Solid Rock",
+		"terrain": "ROCK",
+		"resource": "NONE",
+		"resource_amount": 0,
+		"owner": 0,
+		"flags": [
+			"INDESTRUCTIBLE"
+		],
+		"debug_color": "#3E4248"
+	},
+	"1": {
+		"name": "Gold",
+		"terrain": "DIRT",
+		"resource": "GOLD",
+		"resource_amount": 100,
+		"owner": 0,
+		"flags": [],
+		"debug_color": "#FFE137"
+	},
+	"2": {
+		"name": "Earth",
+		"terrain": "DIRT",
+		"resource": "NONE",
+		"resource_amount": 0,
+		"owner": 0,
+		"flags": [],
+		"debug_color": "#84522D"
+	},
+	"4": {
+		"name": "Reinforced Wall",
+		"terrain": "ROCK",
+		"resource": "NONE",
+		"resource_amount": 0,
+		"owner": 0,
+		"flags": [],
+		"debug_color": "#665B52"
+	},
+	"11": {
+		"name": "Lava",
+		"terrain": "LAVA",
+		"resource": "NONE",
+		"resource_amount": 0,
+		"owner": 0,
+		"flags": [],
+		"debug_color": "#E64810"
+	},
+	"13": {
+		"name": "Portal",
+		"terrain": "FLOOR",
+		"resource": "NONE",
+		"resource_amount": 0,
+		"owner": 0,
+		"flags": [
+			"PORTAL"
+		],
+		"debug_color": "#101010"
+	},
+	"14": {
+		"name": "Dungeon Heart",
+		"terrain": "FLOOR",
+		"resource": "NONE",
+		"resource_amount": 0,
+		"owner": 0,
+		"flags": [
+			"DUNGEON_HEART"
+		],
+		"debug_color": "#FF8080"
+	},
+	"20": {
+		"name": "Room",
+		"terrain": "FLOOR",
+		"resource": "NONE",
+		"resource_amount": 0,
+		"owner": 0,
+		"flags": [
+			"ROOM"
+		],
+		"debug_color": "#AAAAAA"
+	},
+	"26": {
+		"name": "Bridge",
+		"terrain": "FLOOR",
+		"resource": "NONE",
+		"resource_amount": 0,
+		"owner": 0,
+		"flags": [
+			"BRIDGE"
+		],
+		"debug_color": "#C7A46A"
+	},
+	"52": {
+		"name": "Gems",
+		"terrain": "ROCK",
+		"resource": "GEMS",
+		"resource_amount": 100,
+		"owner": 0,
+		"flags": [],
+		"debug_color": "#5EE2FF"
+	},
+	"54": {
+		"name": "Purple Path",
+		"terrain": "FLOOR",
+		"resource": "NONE",
+		"resource_amount": 0,
+		"owner": 0,
+		"flags": [
+			"SPECIAL_PATH"
+		],
+		"debug_color": "#A050D8"
+	}
+}

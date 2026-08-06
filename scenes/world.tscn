@@ -2,6 +2,7 @@
 
 [ext_resource type="PackedScene" uid="uid://p11scqgpdpum" path="res://scenes/dungeon.tscn" id="1_nnsk1"]
 [ext_resource type="Script" uid="uid://c5d8aoe83osju" path="res://scripts/camera_rig.gd" id="2_rwgxs"]
+[ext_resource type="Script" uid="uid://kxgdr5rk4n3t" path="res://scripts/world/dungeon_map.gd" id="3_4mrxx"]
 [ext_resource type="Script" uid="uid://b0wu8app0mc8y" path="res://scripts/dungeon_generator.gd" id="3_k0juu"]
 [ext_resource type="Script" uid="uid://bn6hxrjaev47l" path="res://scripts/cell_picker.gd" id="4_71j4m"]
 [ext_resource type="Script" uid="uid://cu48ut03x3mk2" path="res://scripts/selection_manager.gd" id="6_i7141"]
@@ -37,6 +38,10 @@ show_fixed_selection = false
 [node name="DungeonGenerator" type="Node" parent="Dungeon" unique_id=99846104]
 script = ExtResource("3_k0juu")
 map_size = 64
+
+[node name="DungeonMap" type="Node" parent="Dungeon" unique_id=600089672]
+script = ExtResource("3_4mrxx")
+map_file_path = "res://maps/test_map_01.dmap"
 
 [node name="CellPicker" type="Node" parent="Dungeon" unique_id=947913642]
 script = ExtResource("4_71j4m")
