@@ -44,6 +44,7 @@ script = ExtResource("4_71j4m")
 [node name="SelectionManager" type="Node" parent="Dungeon" unique_id=193603083]
 script = ExtResource("6_i7141")
 border_surface_offset = 0.001
+hover_border_surface_offset = 0.001
 
 [node name="SelectionFill" type="MeshInstance3D" parent="Dungeon/SelectionManager" unique_id=674478584]
 material_override = SubResource("ShaderMaterial_wp35b")

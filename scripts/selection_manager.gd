@@ -4,8 +4,12 @@ extends Node
 
 # Tracks hover, click and rectangular drag selections.
 #
-# Owns selection state and coordinates the selection fill and border
-# visuals. Geometry generation is delegated to dedicated builders.
+# Selection is additive:
+# - dragging from an unselected cell adds cells;
+# - dragging from a selected cell removes cells.
+#
+# Selection state is stored independently from the generated fill and
+# border meshes. Geometry generation is delegated to dedicated builders.
 
 
 # -------------------------------------------------------------------
@@ -39,6 +43,9 @@ enum SelectionMode {
 
 @export_range(0.001, 0.10, 0.001)
 var fill_surface_offset: float = 0.015
+
+@export_range(0.0, 0.10, 0.001)
+var fill_bottom_clearance: float = 0.015
 
 
 # -------------------------------------------------------------------
@@ -104,19 +111,23 @@ var drag_current_cell: Vector2i = DungeonConstants.NO_CELL
 var selected_start_cell: Vector2i = DungeonConstants.NO_CELL
 var selected_end_cell: Vector2i = DungeonConstants.NO_CELL
 
-# The authoritative committed selection.
+# Authoritative committed selection.
 #
-# Dictionary keys are selected cell coordinates. Values are always true.
+# Keys are selected cell coordinates. Values are always true.
 var selected_cell_lookup: Dictionary = {}
 
-# Snapshot of the committed selection when the current drag began.
+# Snapshot of the committed selection when a drag begins.
 #
-# Every drag preview is rebuilt from this snapshot so reducing or
-# reversing the drag rectangle produces the correct result.
+# Every preview is rebuilt from this snapshot so shrinking or reversing
+# a drag produces the correct result.
 var selection_before_drag: Dictionary = {}
 
-# Array representation supplied to builders, signals and gameplay systems.
+# Current live preview while dragging.
+var preview_cell_lookup: Dictionary = {}
+
+# Array representations used by builders, signals and gameplay systems.
 var selected_cells: Array[Vector2i] = []
+var preview_cells: Array[Vector2i] = []
 
 
 # -------------------------------------------------------------------
@@ -241,15 +252,8 @@ func finish_selection() -> void:
 	selected_start_cell = drag_start_cell
 	selected_end_cell = drag_current_cell
 
-	var dragged_cells: Array[Vector2i] = (
-		_get_cells_in_rectangle(
-			selected_start_cell,
-			selected_end_cell
-		)
-	)
-
-	selected_cell_lookup = _build_drag_preview_lookup(
-		dragged_cells
+	selected_cell_lookup = _copy_cell_lookup(
+		preview_cell_lookup
 	)
 
 	selected_cells = _cell_lookup_to_array(
@@ -265,10 +269,42 @@ func finish_selection() -> void:
 	)
 
 	selection_before_drag.clear()
+	preview_cell_lookup.clear()
+	preview_cells.clear()
 
 	selection_changed.emit(
 		selected_start_cell,
 		selected_end_cell,
+		selected_cells
+	)
+
+
+func cancel_drag() -> void:
+	if not is_dragging:
+		return
+
+	is_dragging = false
+
+	selected_cell_lookup = _copy_cell_lookup(
+		selection_before_drag
+	)
+
+	selected_cells = _cell_lookup_to_array(
+		selected_cell_lookup
+	)
+
+	has_committed_selection = (
+		not selected_cells.is_empty()
+	)
+
+	selection_before_drag.clear()
+	preview_cell_lookup.clear()
+	preview_cells.clear()
+
+	drag_start_cell = DungeonConstants.NO_CELL
+	drag_current_cell = DungeonConstants.NO_CELL
+
+	_show_selection_visuals(
 		selected_cells
 	)
 
@@ -287,29 +323,14 @@ func clear_selection() -> void:
 
 	selected_cell_lookup.clear()
 	selection_before_drag.clear()
+	preview_cell_lookup.clear()
+
 	selected_cells.clear()
+	preview_cells.clear()
 
 	_clear_selection_visuals()
 
 	selection_cleared.emit()
-
-
-func _build_drag_preview_lookup(
-	dragged_cells: Array[Vector2i]
-) -> Dictionary:
-	var preview_lookup: Dictionary = _copy_cell_lookup(
-		selection_before_drag
-	)
-
-	for cell: Vector2i in dragged_cells:
-		match drag_mode:
-			SelectionMode.ADD:
-				preview_lookup[cell] = true
-
-			SelectionMode.REMOVE:
-				preview_lookup.erase(cell)
-
-	return preview_lookup
 
 
 # -------------------------------------------------------------------
@@ -325,7 +346,6 @@ func show_hover(
 
 	if (
 		cell == hovered_cell
-		and hover_border != null
 		and hover_border.mesh != null
 	):
 		return
@@ -360,16 +380,12 @@ func _update_preview_selection() -> void:
 		)
 	)
 
-	var preview_lookup: Dictionary = (
-		_build_drag_preview_lookup(
-			dragged_cells
-		)
+	preview_cell_lookup = _build_drag_preview_lookup(
+		dragged_cells
 	)
 
-	var preview_cells: Array[Vector2i] = (
-		_cell_lookup_to_array(
-			preview_lookup
-		)
+	preview_cells = _cell_lookup_to_array(
+		preview_cell_lookup
 	)
 
 	_show_selection_visuals(
@@ -383,6 +399,26 @@ func _update_preview_selection() -> void:
 	)
 
 
+func _build_drag_preview_lookup(
+	dragged_cells: Array[Vector2i]
+) -> Dictionary:
+	var preview_lookup: Dictionary = _copy_cell_lookup(
+		selection_before_drag
+	)
+
+	for cell: Vector2i in dragged_cells:
+		match drag_mode:
+			SelectionMode.ADD:
+				preview_lookup[cell] = true
+
+			SelectionMode.REMOVE:
+				preview_lookup.erase(
+					cell
+				)
+
+	return preview_lookup
+
+
 # -------------------------------------------------------------------
 # Selection Display
 # -------------------------------------------------------------------
@@ -390,19 +426,14 @@ func _update_preview_selection() -> void:
 func _show_selection_visuals(
 	cells: Array[Vector2i]
 ) -> void:
-	if (
-		selection_fill != null
-		and fill_builder != null
-	):
+	if fill_builder != null:
 		selection_fill.mesh = fill_builder.build_mesh(
 			cells,
-			fill_surface_offset
+			fill_surface_offset,
+			fill_bottom_clearance
 		)
 
-	if (
-		selection_border != null
-		and border_builder != null
-	):
+	if border_builder != null:
 		selection_border.mesh = border_builder.build_mesh(
 			cells,
 			border_edge_width,
@@ -421,9 +452,6 @@ func _clear_selection_visuals() -> void:
 func _show_hover_border(
 	cells: Array[Vector2i]
 ) -> void:
-	if hover_border == null:
-		return
-
 	if border_builder == null:
 		return
 
@@ -486,6 +514,53 @@ func _get_cells_in_rectangle(
 
 
 # -------------------------------------------------------------------
+# Selection Lookup Helpers
+# -------------------------------------------------------------------
+
+func _copy_cell_lookup(
+	source: Dictionary
+) -> Dictionary:
+	var copy: Dictionary = {}
+
+	for cell_variant: Variant in source.keys():
+		var cell: Vector2i = (
+			cell_variant as Vector2i
+		)
+
+		copy[cell] = true
+
+	return copy
+
+
+func _cell_lookup_to_array(
+	cell_lookup: Dictionary
+) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+
+	for cell_variant: Variant in cell_lookup.keys():
+		var cell: Vector2i = (
+			cell_variant as Vector2i
+		)
+
+		cells.append(
+			cell
+		)
+
+	cells.sort_custom(
+		func(
+			first: Vector2i,
+			second: Vector2i
+		) -> bool:
+			if first.y == second.y:
+				return first.x < second.x
+
+			return first.y < second.y
+	)
+
+	return cells
+
+
+# -------------------------------------------------------------------
 # Cell Validation
 # -------------------------------------------------------------------
 
@@ -514,41 +589,75 @@ func handle_input(
 	if cell_picker == null:
 		return
 
+	if event is InputEventKey:
+		_handle_key_input(
+			event as InputEventKey
+		)
+		return
+
 	if event is InputEventMouseButton:
-		var mouse_event := (
+		_handle_mouse_button(
 			event as InputEventMouseButton
 		)
-
-		if mouse_event.button_index != MOUSE_BUTTON_LEFT:
-			return
-
-		if mouse_event.pressed:
-			var cell: Vector2i = (
-				cell_picker.get_current_cell()
-			)
-
-			if cell != DungeonConstants.NO_CELL:
-				begin_selection(
-					cell
-				)
-
-			return
-
-		finish_selection()
 		return
 
 	if event is InputEventMouseMotion:
-		if not is_dragging:
-			return
+		_handle_mouse_motion()
 
+
+func _handle_key_input(
+	key_event: InputEventKey
+) -> void:
+	if not key_event.pressed:
+		return
+
+	if key_event.echo:
+		return
+
+	if key_event.keycode != KEY_ESCAPE:
+		return
+
+	if is_dragging:
+		cancel_drag()
+	else:
+		clear_selection()
+
+
+func _handle_mouse_button(
+	mouse_event: InputEventMouseButton
+) -> void:
+	if mouse_event.button_index != MOUSE_BUTTON_LEFT:
+		return
+
+	if mouse_event.pressed:
 		var cell: Vector2i = (
 			cell_picker.get_current_cell()
 		)
 
 		if cell != DungeonConstants.NO_CELL:
-			update_selection(
+			begin_selection(
 				cell
 			)
+
+		return
+
+	finish_selection()
+
+
+func _handle_mouse_motion() -> void:
+	if not is_dragging:
+		return
+
+	var cell: Vector2i = (
+		cell_picker.get_current_cell()
+	)
+
+	if cell == DungeonConstants.NO_CELL:
+		return
+
+	update_selection(
+		cell
+	)
 
 
 # -------------------------------------------------------------------
@@ -559,48 +668,21 @@ func has_selection() -> bool:
 	return has_committed_selection
 
 
+func is_cell_selected(
+	cell: Vector2i
+) -> bool:
+	return selected_cell_lookup.has(
+		cell
+	)
+
+
 func get_selected_cells() -> Array[Vector2i]:
 	return selected_cells.duplicate()
 
 
+func get_preview_cells() -> Array[Vector2i]:
+	return preview_cells.duplicate()
+
+
 func get_hovered_cell() -> Vector2i:
 	return hovered_cell
-
-
-# -------------------------------------------------------------------
-# Selection Lookup Helpers
-# -------------------------------------------------------------------
-
-func _copy_cell_lookup(
-	source: Dictionary
-) -> Dictionary:
-	var copy: Dictionary = {}
-
-	for cell_variant: Variant in source.keys():
-		var cell: Vector2i = cell_variant as Vector2i
-		copy[cell] = true
-
-	return copy
-
-
-func _cell_lookup_to_array(
-	cell_lookup: Dictionary
-) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-
-	for cell_variant: Variant in cell_lookup.keys():
-		var cell: Vector2i = cell_variant as Vector2i
-
-		cells.append(
-			cell
-		)
-
-	cells.sort_custom(
-		func(first: Vector2i, second: Vector2i) -> bool:
-			if first.y == second.y:
-				return first.x < second.x
-
-			return first.y < second.y
-	)
-
-	return cells
