@@ -12,14 +12,8 @@ extends Node
 
 @export_category("Map Layout")
 
-@export_range(1, 128, 1)
-var map_size: int = 21
-
 @export_range(0.1, 10.0, 0.1)
 var cell_size: float = 1.0
-
-@export_range(0, 20, 1)
-var starting_area_radius: int = 2
 
 @export_range(1, 16, 1)
 var subdivisions: int = 5
@@ -73,9 +67,28 @@ var floor_material: StandardMaterial3D
 # Derived Properties
 # -------------------------------------------------------------------
 
-var map_half_size: float:
+var map_half_width: float:
 	get:
-		return float(map_size) * cell_size * 0.5
+		if dungeon_map == null:
+			return 0.0
+
+		return (
+			float(dungeon_map.width)
+			* cell_size
+			* 0.5
+		)
+
+
+var map_half_depth: float:
+	get:
+		if dungeon_map == null:
+			return 0.0
+
+		return (
+			float(dungeon_map.height)
+			* cell_size
+			* 0.5
+		)
 
 
 var terrain_top_y: float:
@@ -89,10 +102,33 @@ var floor_y: float:
 
 
 # -------------------------------------------------------------------
+# Dependencies
+# -------------------------------------------------------------------
+
+var dungeon_map: DungeonMap
+
+
+# -------------------------------------------------------------------
 # Initialization
 # -------------------------------------------------------------------
 
-func initialize() -> void:
+func initialize(
+	new_dungeon_map: DungeonMap
+) -> void:
+	if new_dungeon_map == null:
+		push_error(
+			"DungeonGenerator: DungeonMap dependency is missing."
+		)
+		return
+
+	if not new_dungeon_map.is_loaded:
+		push_error(
+			"DungeonGenerator: DungeonMap has not been loaded."
+		)
+		return
+
+	dungeon_map = new_dungeon_map
+
 	validate_settings()
 	create_noise_generators()
 	create_materials()
@@ -103,11 +139,6 @@ func initialize() -> void:
 # -------------------------------------------------------------------
 
 func validate_settings() -> void:
-	map_size = maxi(
-		map_size,
-		1
-	)
-
 	cell_size = maxf(
 		cell_size,
 		0.01
@@ -116,16 +147,6 @@ func validate_settings() -> void:
 	subdivisions = maxi(
 		subdivisions,
 		1
-	)
-
-	var maximum_starting_radius: int = (
-		(map_size - 1) / 2
-	)
-
-	starting_area_radius = clampi(
-		starting_area_radius,
-		0,
-		maximum_starting_radius
 	)
 
 
@@ -165,70 +186,68 @@ func create_noise(
 
 func create_materials() -> void:
 	terrain_material = StandardMaterial3D.new()
-	terrain_material.albedo_color = Color(
-		0.35,
-		0.18,
-		0.08
-	)
+	terrain_material.vertex_color_use_as_albedo = true
+	terrain_material.albedo_color = Color.WHITE
 	terrain_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	terrain_material.roughness = 1.0
+	terrain_material.metallic = 0.0
+	terrain_material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 
 	floor_material = StandardMaterial3D.new()
-	floor_material.albedo_color = Color(
-		0.22,
-		0.24,
-		0.27
-	)
+	floor_material.vertex_color_use_as_albedo = true
+	floor_material.albedo_color = Color.WHITE
 	floor_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	floor_material.roughness = 1.0
+	floor_material.metallic = 0.0
+	floor_material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 
 
+## -------------------------------------------------------------------
+# Map Queries
 # -------------------------------------------------------------------
-# Map queries
-# -------------------------------------------------------------------
 
-# Returns true when the cell coordinate exists inside the map.
-func is_valid_map_cell(cell: Vector2i) -> bool:
-	return (
-		cell.x >= 0
-		and cell.x < map_size
-		and cell.y >= 0
-		and cell.y < map_size
-	)
-
-
-# Returns true when the cell belongs to the excavated starting area.
-func is_hole(cell: Vector2i) -> bool:
-	var centre: int = map_size / 2
-
-	var distance_x: int = absi(
-		cell.x - centre
-	)
-
-	var distance_z: int = absi(
-		cell.y - centre
-	)
-
-	return (
-		distance_x <= starting_area_radius
-		and distance_z <= starting_area_radius
-	)
-
-
-# Checks whether a valid map cell is part of the starting hole.
-# Cells outside the map are treated as solid.
-func is_excavated_in_bounds(cell: Vector2i) -> bool:
-	if not is_valid_map_cell(cell):
+# Returns true when the cell coordinate exists inside the loaded map.
+func is_valid_map_cell(
+	cell: Vector2i
+) -> bool:
+	if dungeon_map == null:
 		return false
 
-	return is_hole(cell)
+	return dungeon_map.is_valid_cell(
+		cell
+	)
+
+
+# Returns true when a valid map cell contains open terrain.
+func is_hole(
+	cell: Vector2i
+) -> bool:
+	if dungeon_map == null:
+		return false
+
+	if not dungeon_map.is_valid_cell(
+		cell
+	):
+		return false
+
+	return dungeon_map.is_open(
+		cell
+	)
 
 
 # Returns true when a cell contains open space.
-# Space beyond the map boundary is also considered open.
-func is_open_cell(cell: Vector2i) -> bool:
+#
+# Space beyond the map boundary is treated as open so exposed outer
+# faces can still be generated.
+func is_open_cell(
+	cell: Vector2i
+) -> bool:
 	if not is_valid_map_cell(cell):
 		return true
 
-	return is_hole(cell)
+	return dungeon_map.is_open(
+		cell
+	)
 
 
 # Converts a Dungeon-local 3D position into a logical map cell.
@@ -236,12 +255,12 @@ func local_position_to_cell(
 	local_position: Vector3
 ) -> Vector2i:
 	var cell_x: int = floori(
-		(local_position.x + map_half_size)
+		(local_position.x + map_half_width)
 		/ cell_size
 	)
 
 	var cell_z: int = floori(
-		(local_position.z + map_half_size)
+		(local_position.z + map_half_depth)
 		/ cell_size
 	)
 
@@ -264,14 +283,14 @@ func get_terrain_point(
 		float(lattice_x)
 		/ subdivisions_float
 		* cell_size
-		- map_half_size
+		- map_half_width
 	)
 
 	var world_z: float = (
 		float(lattice_z)
 		/ subdivisions_float
 		* cell_size
-		- map_half_size
+		- map_half_depth
 	)
 
 	var sample_x: float = float(lattice_x)
@@ -324,6 +343,7 @@ func generate_level() -> void:
 func build_terrain_mesh() -> ArrayMesh:
 	var surface_tool: SurfaceTool = SurfaceTool.new()
 	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	surface_tool.set_smooth_group(-1)
 
 	create_top_surface(surface_tool)
 	create_hole_walls(surface_tool)
@@ -346,28 +366,33 @@ func build_terrain_mesh() -> ArrayMesh:
 func create_top_surface(
 	surface_tool: SurfaceTool
 ) -> void:
-	for cell_x: int in range(map_size):
-		for cell_z: int in range(map_size):
-			if is_hole(
-				Vector2i(
-					cell_x,
-					cell_z
-				)
-			):
+	for cell_x: int in range(dungeon_map.width):
+		for cell_z: int in range(dungeon_map.height):
+			var cell: Vector2i = Vector2i(
+				cell_x,
+				cell_z
+			)
+
+			if is_hole(cell):
 				continue
 
 			create_cell_top(
 				surface_tool,
-				cell_x,
-				cell_z
+				cell
 			)
 
 
 func create_cell_top(
 	surface_tool: SurfaceTool,
-	cell_x: int,
-	cell_z: int
+	cell: Vector2i
 ) -> void:
+	var cell_color: Color = dungeon_map.get_debug_color(
+		cell
+	)
+
+	var cell_x: int = cell.x
+	var cell_z: int = cell.y
+
 	var lattice_start_x: int = (
 		cell_x * subdivisions
 	)
@@ -410,14 +435,16 @@ func create_cell_top(
 				surface_tool,
 				point_00,
 				point_01,
-				point_10
+				point_10,
+				cell_color
 			)
 
 			add_triangle(
 				surface_tool,
 				point_10,
 				point_01,
-				point_11
+				point_11,
+				cell_color
 			)
 
 
@@ -428,8 +455,12 @@ func create_cell_top(
 func create_hole_walls(
 	surface_tool: SurfaceTool
 ) -> void:
-	for cell_x: int in range(map_size):
-		for cell_z: int in range(map_size):
+	for cell_x: int in range(
+		dungeon_map.width
+	):
+		for cell_z: int in range(
+			dungeon_map.height
+		):
 			var cell: Vector2i = Vector2i(
 				cell_x,
 				cell_z
@@ -438,59 +469,88 @@ func create_hole_walls(
 			if not is_hole(cell):
 				continue
 
-			if not is_excavated_in_bounds(
-				Vector2i(
-					cell_x,
-					cell_z - 1
-				)
+			var north_cell: Vector2i = Vector2i(
+				cell_x,
+				cell_z - 1
+			)
+
+			var south_cell: Vector2i = Vector2i(
+				cell_x,
+				cell_z + 1
+			)
+
+			var west_cell: Vector2i = Vector2i(
+				cell_x - 1,
+				cell_z
+			)
+
+			var east_cell: Vector2i = Vector2i(
+				cell_x + 1,
+				cell_z
+			)
+
+			# North wall.
+			if (
+				is_valid_map_cell(north_cell)
+				and not is_hole(north_cell)
 			):
 				create_horizontal_wall(
 					surface_tool,
 					cell_x,
-					cell_z
+					cell_z,
+					dungeon_map.get_debug_color(
+						north_cell
+					)
 				)
 
-			if not is_excavated_in_bounds(
-				Vector2i(
-					cell_x,
-					cell_z + 1
-				)
+			# South wall.
+			if (
+				is_valid_map_cell(south_cell)
+				and not is_hole(south_cell)
 			):
 				create_horizontal_wall(
 					surface_tool,
 					cell_x,
-					cell_z + 1
+					cell_z + 1,
+					dungeon_map.get_debug_color(
+						south_cell
+					)
 				)
 
-			if not is_excavated_in_bounds(
-				Vector2i(
-					cell_x - 1,
-					cell_z
-				)
+			# West wall.
+			if (
+				is_valid_map_cell(west_cell)
+				and not is_hole(west_cell)
 			):
 				create_vertical_wall(
 					surface_tool,
 					cell_x,
-					cell_z
+					cell_z,
+					dungeon_map.get_debug_color(
+						west_cell
+					)
 				)
 
-			if not is_excavated_in_bounds(
-				Vector2i(
-					cell_x + 1,
-					cell_z
-				)
+			# East wall.
+			if (
+				is_valid_map_cell(east_cell)
+				and not is_hole(east_cell)
 			):
 				create_vertical_wall(
 					surface_tool,
 					cell_x + 1,
-					cell_z
+					cell_z,
+					dungeon_map.get_debug_color(
+						east_cell
+					)
 				)
 
 
 func create_horizontal_wall(
 	surface_tool: SurfaceTool,
 	cell_x: int,
-	boundary_z: int
+	boundary_z: int,
+	color: Color
 ) -> void:
 	var start_lattice_x: int = (
 		cell_x * subdivisions
@@ -528,14 +588,16 @@ func create_horizontal_wall(
 			top_left,
 			top_right,
 			bottom_left,
-			bottom_right
+			bottom_right,
+			color
 		)
 
 
 func create_vertical_wall(
 	surface_tool: SurfaceTool,
 	boundary_x: int,
-	cell_z: int
+	cell_z: int,
+	color: Color
 ) -> void:
 	var lattice_x: int = (
 		boundary_x * subdivisions
@@ -573,7 +635,8 @@ func create_vertical_wall(
 			top_left,
 			top_right,
 			bottom_left,
-			bottom_right
+			bottom_right,
+			color
 		)
 
 
@@ -583,49 +646,34 @@ func create_vertical_wall(
 
 func build_floor_mesh() -> ArrayMesh:
 	var surface_tool: SurfaceTool = SurfaceTool.new()
-	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-
-	var north_west: Vector3 = Vector3(
-		-map_half_size,
-		floor_y,
-		-map_half_size
+	surface_tool.begin(
+		Mesh.PRIMITIVE_TRIANGLES
 	)
 
-	var north_east: Vector3 = Vector3(
-		map_half_size,
-		floor_y,
-		-map_half_size
-	)
+	for cell_y: int in range(
+		dungeon_map.height
+	):
+		for cell_x: int in range(
+			dungeon_map.width
+		):
+			var cell: Vector2i = Vector2i(
+				cell_x,
+				cell_y
+			)
 
-	var south_west: Vector3 = Vector3(
-		-map_half_size,
-		floor_y,
-		map_half_size
-	)
+			if not dungeon_map.is_open(cell):
+				continue
 
-	var south_east: Vector3 = Vector3(
-		map_half_size,
-		floor_y,
-		map_half_size
-	)
-
-	add_triangle(
-		surface_tool,
-		north_west,
-		south_west,
-		north_east
-	)
-
-	add_triangle(
-		surface_tool,
-		north_east,
-		south_west,
-		south_east
-	)
+			_add_floor_cell(
+				surface_tool,
+				cell
+			)
 
 	surface_tool.generate_normals()
 
-	var generated_mesh: ArrayMesh = surface_tool.commit()
+	var generated_mesh: ArrayMesh = (
+		surface_tool.commit()
+	)
 
 	generated_mesh.surface_set_material(
 		0,
@@ -635,6 +683,73 @@ func build_floor_mesh() -> ArrayMesh:
 	return generated_mesh
 
 
+func _add_floor_cell(
+	surface_tool: SurfaceTool,
+	cell: Vector2i
+) -> void:
+	var minimum_x: float = (
+		float(cell.x) * cell_size
+		- map_half_width
+	)
+
+	var minimum_z: float = (
+		float(cell.y) * cell_size
+		- map_half_depth
+	)
+
+	var maximum_x: float = (
+		minimum_x + cell_size
+	)
+
+	var maximum_z: float = (
+		minimum_z + cell_size
+	)
+
+	var north_west: Vector3 = Vector3(
+		minimum_x,
+		floor_y,
+		minimum_z
+	)
+
+	var north_east: Vector3 = Vector3(
+		maximum_x,
+		floor_y,
+		minimum_z
+	)
+
+	var south_west: Vector3 = Vector3(
+		minimum_x,
+		floor_y,
+		maximum_z
+	)
+
+	var south_east: Vector3 = Vector3(
+		maximum_x,
+		floor_y,
+		maximum_z
+	)
+
+	var cell_color: Color = dungeon_map.get_debug_color(
+		cell
+	)
+
+	add_triangle(
+		surface_tool,
+		north_west,
+		south_west,
+		north_east,
+		cell_color
+	)
+
+	add_triangle(
+		surface_tool,
+		north_east,
+		south_west,
+		south_east,
+		cell_color
+	)
+	
+	
 # -------------------------------------------------------------------
 # Mesh Helpers
 # -------------------------------------------------------------------
@@ -643,10 +758,16 @@ func add_triangle(
 	surface_tool: SurfaceTool,
 	point_a: Vector3,
 	point_b: Vector3,
-	point_c: Vector3
+	point_c: Vector3,
+	color: Color
 ) -> void:
+	surface_tool.set_color(color)
 	surface_tool.add_vertex(point_a)
+
+	surface_tool.set_color(color)
 	surface_tool.add_vertex(point_b)
+
+	surface_tool.set_color(color)
 	surface_tool.add_vertex(point_c)
 
 
@@ -655,18 +776,21 @@ func add_quad(
 	top_left: Vector3,
 	top_right: Vector3,
 	bottom_left: Vector3,
-	bottom_right: Vector3
+	bottom_right: Vector3,
+	color: Color
 ) -> void:
 	add_triangle(
 		surface_tool,
 		top_left,
 		bottom_left,
-		top_right
+		top_right,
+		color
 	)
 
 	add_triangle(
 		surface_tool,
 		top_right,
 		bottom_left,
-		bottom_right
+		bottom_right,
+		color
 	)

@@ -19,7 +19,7 @@ shader_parameter/fill_opacity = 0.22
 background_mode = 1
 background_color = Color(0.14839911, 0.14920926, 0.17187482, 1)
 ambient_light_source = 2
-ambient_light_color = Color(0.24477637, 0.2447764, 0.24477637, 1)
+ambient_light_color = Color(0.61339027, 0.61339027, 0.61339027, 1)
 ambient_light_energy = 0.4
 glow_enabled = true
 glow_normalized = true
@@ -37,11 +37,11 @@ show_fixed_selection = false
 
 [node name="DungeonGenerator" type="Node" parent="Dungeon" unique_id=99846104]
 script = ExtResource("3_k0juu")
-map_size = 64
+horizontal_noise_strength = 0.03
 
 [node name="DungeonMap" type="Node" parent="Dungeon" unique_id=600089672]
 script = ExtResource("3_4mrxx")
-map_file_path = "res://maps/test_map_01.dmap"
+map_file_path = "res://maps/test_map_02.dmap"
 
 [node name="CellPicker" type="Node" parent="Dungeon" unique_id=947913642]
 script = ExtResource("4_71j4m")

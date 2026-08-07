@@ -31,6 +31,7 @@ extends Node3D
 # -------------------------------------------------------------------
 
 @onready var generator: DungeonGenerator = $DungeonGenerator
+@onready var dungeon_map: DungeonMap = $DungeonMap
 @onready var cell_picker: CellPicker = $CellPicker
 @onready var selection_manager: SelectionManager = $SelectionManager
 
@@ -53,6 +54,12 @@ func _ready() -> void:
 		)
 		return
 
+	if dungeon_map == null:
+		push_error(
+			"Dungeon: DungeonMap is missing."
+		)
+		return
+
 	if cell_picker == null:
 		push_error(
 			"Dungeon: CellPicker is missing."
@@ -65,7 +72,13 @@ func _ready() -> void:
 		)
 		return
 
-	generator.initialize()
+	if not dungeon_map.load_configured_map():
+		return
+
+	generator.initialize(
+		dungeon_map
+	)
+
 	generator.generate_level()
 
 	cell_picker.initialize(
@@ -137,16 +150,9 @@ func _get_fixed_selection_target() -> Vector2i:
 	if fixed_selection_cell != DungeonConstants.NO_CELL:
 		return fixed_selection_cell
 
-	var centre: int = generator.map_size / 2
-
-	var automatic_x: int = mini(
-		centre + generator.starting_area_radius + 1,
-		generator.map_size - 1
-	)
-
 	return Vector2i(
-		automatic_x,
-		centre
+		dungeon_map.width / 2,
+		dungeon_map.height / 2
 	)
 
 
